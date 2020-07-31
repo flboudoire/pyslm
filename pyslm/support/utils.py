@@ -26,12 +26,15 @@ def getSupportAngles(part: Part) -> np.ndarray:
     return theta
 
 
-def getOverhangMesh(part: Part, overhangAngle: float) -> trimesh.Trimesh:
+def getOverhangMesh(part: Part, overhangAngle: float, splitMesh: Optional[bool] = False) -> trimesh.Trimesh:
     """
-    Gets the overhang mesh from a :class:`Part`.
+    Gets the overhang mesh from a :class:`Part`. If the individual regions for the overhang mesh require separating,
+    the parameter :code:`splitMesh` should be set to True. This will split regions by their network connectivity using
+    Trimesh.
 
     :param part: The part to extract the overhang mesh from
     :param overhangAngle: The overhang angle in degrees
+    :param: splitMesh: If the overhang mesh should be split into separate trimesh entities by network connnectivity
     :return: The overhang mesh
     """
     # Upward vector for support angles
@@ -47,7 +50,10 @@ def getOverhangMesh(part: Part, overhangAngle: float) -> trimesh.Trimesh:
     overhangMesh = trimesh.Trimesh(vertices=part.geometry.vertices,
                                    faces=part.geometry.faces[supportFaceIds])
 
-    return overhangMesh
+    if splitMesh:
+        return overhangMesh.split(only_watertight=False)
+    else:
+        return overhangMesh
 
 def approximateSupportMomentArea(part: Part, overhangAngle: float) -> float:
     """
