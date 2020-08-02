@@ -38,7 +38,7 @@ def getOverhangMesh(part: Part, overhangAngle: float, splitMesh: Optional[bool] 
     :return: The overhang mesh
     """
     # Upward vector for support angles
-    v0 = np.array([[0., 0., -1.0]])
+    v0 = np.array([[0., 0., 1.0]])
 
     # Identify Support Angles
     v1 = part.geometry.face_normals
