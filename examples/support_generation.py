@@ -121,15 +121,18 @@ def extrudeFace(supportFaceMesh, height=None, heightArray=None):
 
 ## CONSTANTS ####
 CORK_PATH = '/home/lparry/Development/src/external/cork/bin/cork'
-MIN_SUPPORT_AREA = 10  # mm2
-MIN_AREA_THRESHOLD = 0.1 # mm2
-RAY_PROJECTION_RESOLUTION = 0.2
-SUPPORT_EDGE_GAP = 1  # mm  - offset between part supports and baseplate supports
-PART_SUPPORT_OFFSET_GAP = 1  # mm  - offset between part supports and baseplate supports
+
+OVERHANG_ANGLE = 50 # deg - Overhang angle
+MIN_AREA_THRESHOLD = 0.5 # mm2
+RAY_PROJECTION_RESOLUTION = 0.2 #mm (default = 0.5)
+GRAD_THRESHOLD = 1.1* np.tan(np.deg2rad(OVERHANG_ANGLE)) * RAY_PROJECTION_RESOLUTION # DEFUALT = 0.5
+SUPPORT_EDGE_GAP = 0.5  # mm  - offset between part supports and baseplate supports (default = 1.0)
+INNER_SUPPORT_EDGE_GAP = 0.5 # mm (default = 0.1)
+PART_SUPPORT_OFFSET_GAP = 0.5  # mm  - offset between part supports and baseplate supports
 BASE_PLATE_SUPPORT_DISTANCE = 5  # mm  - Distance between lowest point of part and baseplate
-OVERHANG_ANGLE = 50  # deg - Overhang angle
-RAY_RES = 1  # mm
-TRIANGULATION_SPACING = 1.0
+
+SIMPLIFY_POLYGON_FACTOR = 3*RAY_PROJECTION_RESOLUTION
+TRIANGULATION_SPACING = 0.5 # default = 1
 
 myPart = Part('myPart')
 myPart.setGeometry("../models/frameGuide.stl")
@@ -260,7 +263,7 @@ for subregion in overhangSubregions:
     Find the outlines of any regions of the height map which deviate significantly
     This is used to separate both self-intersecting supports and those which are simply connected to the base-plate
     """
-    outlines = skimage.measure.find_contours(grads, 0.5)
+    outlines = skimage.measure.find_contours(grads, GRAD_THRESHOLD)
 
     if numcnt < 1000:
         pass
@@ -276,8 +279,10 @@ for subregion in overhangSubregions:
         for outline in outlines:
             plt.plot(outline[:, 0], outline[:, 1])
 
+
     numcnt += 1
 
+    polygons = []
 
     for outline in outlines:
 
@@ -285,7 +290,7 @@ for subregion in overhangSubregions:
         Process the outline by finding the boundaries
         """
         outline = outline * RAY_PROJECTION_RESOLUTION + offsetPoly.bounds[0, :]
-        outline = skimage.measure.approximate_polygon(outline, tolerance=RAY_PROJECTION_RESOLUTION)
+        outline = skimage.measure.approximate_polygon(outline, tolerance=SIMPLIFY_POLYGON_FACTOR)
 
         if outline.shape[0] < 3:
             continue
@@ -300,7 +305,18 @@ for subregion in overhangSubregions:
         if not mergedPoly.is_closed or len(mergedPoly.polygons_full) == 0 or mergedPoly.polygons_full[0] is None:
             continue
 
-        bufferPoly = mergedPoly.polygons_full[0].buffer(-0.1)
+        bufferPoly = mergedPoly.polygons_full[0].buffer(-INNER_SUPPORT_EDGE_GAP)
+
+        if isinstance(bufferPoly, shapely.geometry.MultiPolygon):
+            polygons += bufferPoly.geoms
+        else:
+            polygons.append(bufferPoly)
+
+    plt.figure()
+    plt.imshow(heightMap.T)
+    for outline in outlines:
+        plt.plot(outline[:, 0], outline[:, 1])
+    for bufferPoly in polygons:
 
         if bufferPoly.area < MIN_AREA_THRESHOLD:
             continue
@@ -314,7 +330,7 @@ for subregion in overhangSubregions:
         Project upwards to intersect with the upper surface
         Project the vertices downward (-z) to intersect with the cutMesh
         """
-        coords = np.insert(poly_tri[0], 2, values=0.0, axis=1)
+        coords = np.insert(poly_tri[0], 2, values=-1e-7, axis=1)
         ray_dir = np.repeat([[0.,0.,1.]], coords.shape[0], axis=0)
 
         # Find the first location of any triangles which intersect with the part
@@ -323,7 +339,7 @@ for subregion in overhangSubregions:
                                                                              multiple_hits=False)
 
         coords2 = coords.copy()
-        coords2[index_ray, 2] = hitLoc[:, 2] + 0.1
+        coords2[index_ray, 2] = hitLoc[:, 2] - 0.2
 
         ray_dir[:, 2] = -1.0
 
@@ -344,8 +360,9 @@ for subregion in overhangSubregions:
 
                 print('CREATING BASE-PLATE SUPPORT')
             else:
+                print('PROJECTIONS NOT MATCHING')
                 continue
-                raise ValueError('Projections do not match')
+                raise ValueError('PROJECTIONS NOT MATCHING')
 
         # Create a surface from the Ray intersection
         surf2 = trimesh.Trimesh(vertices=coords2, faces=poly_tri[1])
