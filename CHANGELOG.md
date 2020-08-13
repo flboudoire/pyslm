@@ -8,15 +8,16 @@ All notable changes to this project will be documented in this file.
 - Added BaseHatcher.boundaryBoundingBox() to obtain the bounding box of a collection of polygons - returned internally from PyClipper
 - Added a simplifyBoundaries() in hatching/utils.py to simplify polygons (shapely and raw coordinate boundaries using scikit image)
 - hatching.generateExposurePoints() now generates for ContourGeometry
-- Added example/example_custom_island_hatcher.py showing a method to create customised island scan strategies
+- Added example/example_custom_island_hatcher.py showing a method to create customised island scan 
+- Added example/example_build_time_analysis.py to show the processes of estimating build-time
 
 ### Changed
 - Internally generateHatching() and hatch() in subclasses of BaseHatcher to generate the internal hatch geometry to use multiple boundaries
 to ensure that the subregion generation sorting covers the global region. 
-    - Internally BaseHatcher.boundaryBoundingBox() is called instead of BaseHatcher.polygonBoundingBox()
-    - Removed the for loop which previously iterate across boundaries.
-    - Updated IslandHatcher to use this behaviour 
-    - Updated BaseHatcher to use static members where possible
+- Internally BaseHatcher.boundaryBoundingBox() is called instead of BaseHatcher.polygonBoundingBox()
+- Removed the for loop which previously iterate across boundaries.
+- Updated IslandHatcher to use this behaviour 
+- Updated BaseHatcher to use static members where possible
 
 ### Fixed
 - Jump distance between LayerGeometry is accounted for in analysis submodule
