@@ -1,17 +1,17 @@
-from typing import List
+from typing import Optional, Tuple, List
+
 import numpy as np
 import trimesh
 
-from typing import Optional, Tuple, List
-
 from ..core import Part
+
 
 def getSupportAngles(part: Part) -> np.ndarray:
     """
-    Returns the support angles for each triangular face normal. This is mainly used for the benefit of visualisng the
+    Returns the support angles for each triangular face normal. This is mainly used for the benefit of visualising the
     support angles for a part.
 
-    :param part:
+    :param part: The part to obtain support angles from
     :return: The support angles acros tseh whole part
     """
 
@@ -34,7 +34,7 @@ def getOverhangMesh(part: Part, overhangAngle: float, splitMesh: Optional[bool] 
 
     :param part: The part to extract the overhang mesh from
     :param overhangAngle: The overhang angle in degrees
-    :param: splitMesh: If the overhang mesh should be split into separate trimesh entities by network connnectivity
+    :param: splitMesh: If the overhang mesh should be split into separate Trimesh entities by network connnectivity
     :return: The overhang mesh
     """
     # Upward vector for support angles
@@ -54,6 +54,7 @@ def getOverhangMesh(part: Part, overhangAngle: float, splitMesh: Optional[bool] 
         return overhangMesh.split(only_watertight=False)
     else:
         return overhangMesh
+
 
 def approximateSupportMomentArea(part: Part, overhangAngle: float) -> float:
     """
@@ -79,8 +80,9 @@ def approximateSupportMomentArea(part: Part, overhangAngle: float) -> float:
     
     return np.sum(faceAreas*zHeights)
 
-def approximateSupportMapByCentroid(part: Part, overhangeAngle: float,
-                                    includeTriangleVertices: Optional[bool]=False) -> Tuple[np.ndarray]:
+
+def approximateSupportMapByCentroid(part: Part, overhangAngle: float,
+                                    includeTriangleVertices: Optional[bool] = False) -> Tuple[np.ndarray]:
     """
     This method to approximate the surface area, projects  a single ray :math:`(0,0,-1)`, form each triangle in the
     overhang mesh -originating from the centroid or optionally each triangle vertex by setting the
@@ -89,48 +91,48 @@ def approximateSupportMapByCentroid(part: Part, overhangeAngle: float,
     which may be used later to generate a support heightmap.
 
     :param part:
-    :param overhangeAngle: The overhang angle in degrees
+    :param overhangAngle: The overhang angle in degrees
     :param includeTriangleVertices: Optional parameter projects also from the triangular vertices
     :return: A tuple with the support map and
     """
 
-    overhangMesh = getOverhangMesh(part, overhangeAngle)
+    overhangMesh = getOverhangMesh(part, overhangAngle)
 
     coords = overhangMesh.triangles_center
 
     if includeTriangleVertices:
         coords = np.vstack([coords, overhangMesh.vertices])
 
-    ray_dir = np.tile(np.array([[0.,0.,-1.0]]), (coords.shape[0],1))
+    ray_dir = np.tile(np.array([[0., 0., -1.0]]), (coords.shape[0], 1))
 
     # Find the first intersection hit of rays project from the triangle.
     hitLoc, index_ray, index_tri = part.geometry.ray.intersects_location(ray_origins=coords,
                                                                          ray_directions=ray_dir,
-                                                                         multiple_hits = False)
+                                                                         multiple_hits=False)
 
-    heightMap =  np.zeros((coords.shape[0],1), dtype=np.float)
-    heightMap[index_ray] = hitLoc[:,2].reshape(-1,1)
+    heightMap = np.zeros((coords.shape[0], 1), dtype=np.float)
+    heightMap[index_ray] = hitLoc[:, 2].reshape(-1, 1)
     
-    heightMap = np.abs(heightMap - coords[:,2])
+    heightMap = np.abs(heightMap - coords[:, 2])
 
     return heightMap
 
 
-def approximateProjectionSupportCost(part: Part, overhangeAngle: float,
-                                     includeTriangleVertices: Optional[bool]=False) -> float:
+def approximateProjectionSupportCost(part: Part, overhangAngle: float,
+                                     includeTriangleVertices: Optional[bool] = False) -> float:
     """
     Provides a support structure cost using ray projection from the overhang regions which allows for self-intersection
     checks.
 
     :param part:
-    :param overhangeAngle: The overhang angle in degree
+    :param overhangAngle: The overhang angle in degree
     :param includeTriangleVertices: Optional parameter projects also from the triangular vertices
     :return: The cost function for support generation
     """
 
-    overhangMesh = getOverhangMesh(part, overhangeAngle)
+    overhangMesh = getOverhangMesh(part, overhangAngle)
 
-    heightMap = approximateSupportMapByCentroid(part, overhangeAngle, includeTriangleVertices)
+    heightMap = approximateSupportMapByCentroid(part, overhangAngle, includeTriangleVertices)
 
     # Project the overhang area
     overhangMesh.vertices[:, 2] = 0.0
