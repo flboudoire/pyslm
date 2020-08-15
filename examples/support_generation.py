@@ -274,10 +274,15 @@ rays = np.array(rays)
 ray_visualize = trimesh.load_path((rays).reshape(-1, 2, 3))
 
 myPart.geometry.visual.vertex_colors = [80,80,80, 125]
+
+supportMesh = trimesh.Trimesh()
+for support in supportExtrudes:
+    supportMesh += support
+
 s2 = trimesh.Scene([myPart.geometry, ray_visualize, visualize_support_edges, overhangMesh] + supportExtrudes)
-s2.show()
+#s2.show()
 
-
+supportMesh.show()
 d
 
 myPart.geometry.visual.vertex_colors = [50,50,50,125]
