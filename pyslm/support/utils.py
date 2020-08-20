@@ -6,17 +6,18 @@ import trimesh
 from ..core import Part
 
 
-def getSupportAngles(part: Part) -> np.ndarray:
+def getSupportAngles(part: Part, unitNormal: np.ndarray = None) -> np.ndarray:
     """
     Returns the support angles for each triangular face normal. This is mainly used for the benefit of visualising the
     support angles for a part.
 
     :param part: The part to obtain support angles from
-    :return: The support angles acros tseh whole part
+    :param unitNormal: The up-vector direction used to calculate the angle against
+    :return: The support angles across the whole part geometry
     """
 
     # Upward vector for support angles
-    v0 = np.array([[0., 0., -1.0]])
+    v0 = np.array([[0., 0., -1.0]]) if unitNormal is None else np.asanyarray(unitNormal)
 
     # Identify Support Angles
     v1 = part.geometry.face_normals
@@ -34,7 +35,7 @@ def getOverhangMesh(part: Part, overhangAngle: float, splitMesh: Optional[bool] 
 
     :param part: The part to extract the overhang mesh from
     :param overhangAngle: The overhang angle in degrees
-    :param: splitMesh: If the overhang mesh should be split into separate Trimesh entities by network connnectivity
+    :param splitMesh: If the overhang mesh should be split into separate Trimesh entities by network connnectivity
     :return: The overhang mesh
     """
     # Upward vector for support angles
