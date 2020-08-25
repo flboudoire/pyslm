@@ -9,6 +9,7 @@ except BaseException as E:
     raise BaseException("Lib Triangle is Required to use this Support.geometry submodule")
 
 from typing import List
+import subprocess
 import numpy as np
 import trimesh
 
@@ -88,3 +89,37 @@ def extrudeFace(extrudeMesh: trimesh.Trimesh, height: Optional[float] = None, he
 
     return extMesh
 
+
+def boolUnion(meshA, meshB, CORK_PATH):
+
+    if isinstance(meshA, trimesh.Trimesh):
+        meshA.export('a.off')
+
+    if isinstance(meshB, trimesh.Trimesh):
+        meshA.export('b.off')
+
+    subprocess.call([CORK_PATH, '-union', 'b.off', 'a.off', 'c.off'])
+    return trimesh.load_mesh('c.off')
+
+
+def boolIntersect(meshA, meshB, CORK_PATH):
+
+    if isinstance(meshA, trimesh.Trimesh):
+        meshA.export('a.off')
+
+    if isinstance(meshB, trimesh.Trimesh):
+        meshA.export('b.off')
+
+    subprocess.call([CORK_PATH, '-isct', 'a.off', 'b.off', 'c.off'])
+    return trimesh.load_mesh('c.off')
+
+def boolDiff(meshA, meshB, CORK_PATH):
+
+    if isinstance(meshA, trimesh.Trimesh):
+        meshA.export('a.off')
+
+    if isinstance(meshB, trimesh.Trimesh):
+        meshA.export('b.off')
+
+    subprocess.call([CORK_PATH, '-diff', 'a.off', 'b.off', 'c.off'])
+    return trimesh.load_mesh('c.off')

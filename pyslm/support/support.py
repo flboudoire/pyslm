@@ -153,15 +153,17 @@ class BlockSupportGenerator(BaseSupportGenerator):
 
     def __init__(self):
 
-        self._supportEdgeGap = 0.5
         self._minimumAreaThreshold = 5.0  # mm2 (default = 10)
         self._rayProjectionResolution = 0.2  # mm (default = 0.5)
 
+        self._lowerProjectionOffset = 0.1
+        self._upperProjectionOffset = 0.1
+
         self._innerSupportEdgeGap = 0.2  # mm (default = 0.1)
-        self._partSupportOffsetGap = 0.5  # mm  - offset between part supports and baseplate supports
+        self._outerSupportEdgeGap = 0.5  # mm  - offset between part supports and baseplate supports
 
         self._triangulationSpacing = 2  # mm (default = 1)
-        self._simplifyPolygonFactor = 3.0 * self._rayProjectionResolution
+        self._simplifyPolygonFactor = 2.0
 
         self._overhangAngle = 45.0  # [deg]
 
@@ -181,12 +183,28 @@ class BlockSupportGenerator(BaseSupportGenerator):
         self._overhangAngle = value
 
     @property
-    def supportEdgeGap(self) -> float:
-        return self._supportEdgeGap
+    def upperProjectionOffset(self) -> float:
+        return self._upperProjectionOffset
 
-    @supportEdgeGap.setter
-    def supportEdgeGap(self, spacing: float):
-        self._supportEdgeGap = spacing
+    @upperProjectionOffset.setter
+    def upperProjectionOffset(self, offset: float) -> None:
+        self._upperProjectionOffset = offset
+
+    @property
+    def lowerProjectionOffset(self) -> float:
+        return self._lowerProjectionOffset
+
+    @lowerProjectionOffset.setter
+    def lowerProjectionOffset(self, offset) -> None:
+        self._lowerProjectionOffset = offset
+
+    @property
+    def outerSupportEdgeGap(self) -> float:
+        return self._outerSupportEdgeGap
+
+    @outerSupportEdgeGap.setter
+    def outerSupportEdgeGap(self, spacing: float):
+        self._outerSupportEdgeGap = spacing
 
     @property
     def innerSupportEdgeGap(self) -> float:
@@ -209,14 +227,18 @@ class BlockSupportGenerator(BaseSupportGenerator):
 
     @property
     def simplifyPolygonFactor(self) -> float:
-        return 3. * self._rayProjectionResolution
+        return self._simplifyPolygonFactor
+
+    @simplifyPolygonFactor.setter
+    def simplifyPolygonFactor(self, value: float) -> None:
+        self._simplifyPolygonFactor = value
 
     @property
     def triangulationSpacing(self) -> float:
         return self._triangulationSpacing
 
     @triangulationSpacing.setter
-    def triangulationSpace(self, spacing: float):
+    def triangulationSpacing(self, spacing: float) -> None:
         self._triangulationSpacing = spacing
 
     @property
@@ -224,7 +246,7 @@ class BlockSupportGenerator(BaseSupportGenerator):
         return self._rayProjectionResolution
 
     @rayProjectionResolution.setter
-    def rayProjectionResolution(self, resolution: float):
+    def rayProjectionResolution(self, resolution: float) -> None:
         self._rayProjectionResolution = resolution
 
     def filterSupportRegion(self, region):
@@ -255,7 +277,6 @@ class BlockSupportGenerator(BaseSupportGenerator):
         hitLoc, index_ray, index_tri = subregion.ray.intersects_location(ray_origins=coords,
                                                                          ray_directions=rays,
                                                                          multiple_hits=False)
-
 
         hitLocCpy = hitLoc.copy()
         hitLocCpy[:, :2] -= offsetPoly.bounds[0, :]
@@ -330,7 +351,7 @@ class BlockSupportGenerator(BaseSupportGenerator):
             polygon = self.flattenSupportRegion(subregion)
 
             # Offset in 2D the support region projection
-            offsetShape = polygon.buffer(-self.supportEdgeGap)
+            offsetShape = polygon.buffer(-self.outerSupportEdgeGap)
 
             if offsetShape is None or offsetShape.area < self.minimumAreaThreshold:
                 print('skipping shape')
@@ -353,7 +374,7 @@ class BlockSupportGenerator(BaseSupportGenerator):
             """
             Note the cutMesh is the project down from the support surface with the original mesh
             """
-            cutMesh = trimesh.load_mesh('c.off')
+            cutMesh = trimesh.load_mesh('c.off', process=True, validate=True)
 
             if len(cutMesh.faces) == 0:
                 extruMesh.visual.face_colors[:,:3] = np.random.randint(254, size=3)
@@ -397,7 +418,7 @@ class BlockSupportGenerator(BaseSupportGenerator):
                 Process the outline by finding the boundaries
                 """
                 outline = outline * self.rayProjectionResolution + offsetPoly.bounds[0, :]
-                outline = approximate_polygon(outline, tolerance=self.simplifyPolygonFactor)
+                outline = approximate_polygon(outline, tolerance=self.simplifyPolygonFactor* self._rayProjectionResolution)
 
                 if outline.shape[0] < 3:
                     continue
@@ -441,7 +462,7 @@ class BlockSupportGenerator(BaseSupportGenerator):
                                                                                  multiple_hits=False)
 
                 coords2 = coords.copy()
-                coords2[index_ray, 2] = hitLoc[:, 2] - 0.2
+                coords2[index_ray, 2] = hitLoc[:, 2] + self.upperProjectionOffset
 
                 ray_dir[:, 2] = -1.0
 
@@ -450,7 +471,7 @@ class BlockSupportGenerator(BaseSupportGenerator):
                 """
                 hitLoc2, index_ray2, index_tri2 = cutMeshUpper.ray.intersects_location(ray_origins=coords2,
                                                                                        ray_directions=ray_dir,
-                                                                                        multiple_hits=False)
+                                                                                       multiple_hits=False)
                 if len(hitLoc) != len(coords) or len(hitLoc2) != len(hitLoc):
                     # The projections up and down do not match indicating that there maybe some flaw
                     print(hitLoc.shape, hitLoc2.shape, coords.shape)
@@ -469,7 +490,7 @@ class BlockSupportGenerator(BaseSupportGenerator):
                 surf2 = trimesh.Trimesh(vertices=coords2, faces=poly_tri[1])
 
                 # Extrude the surface based on the heights from the second ray cast
-                extrudedBlock = extrudeFace(surf2, None, hitLoc2[:, 2] - 0.05)
+                extrudedBlock = extrudeFace(surf2, None, hitLoc2[:, 2] - self.lowerProjectionOffset)
                 extrudedBlock.export('b.off')
 
                 """
@@ -477,7 +498,9 @@ class BlockSupportGenerator(BaseSupportGenerator):
                 boundaries for the support
                 """
                 subprocess.call([self.CORK_PATH, '-diff', 'b.off', 'part.off', 'c.off'])
-                blockSupport = trimesh.load_mesh('c.off')
+                blockSupport = trimesh.load_mesh('c.off', process=True, validate=True)
+                blockSupport.fix_normals()
+                blockSupport.remove_degenerate_faces()
 
                 # Draw the support structures generated
                 blockSupport.visual.face_colors[:,:3] = np.random.randint(254, size=3)
